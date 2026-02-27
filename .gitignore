@@ -1,0 +1,15 @@
+*.class
+.project
+.classpath
+.metadata/*
+.settings/*
+test-output/*
+target/*
+img/*
+bin/*
+test-output.zip
+.vscode/*
+/target/
+**/localactuals/*
+/.idea/*
+.DS_Store
