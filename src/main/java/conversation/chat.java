@@ -11,8 +11,8 @@ public class chat {
     private static final Logger LOGGER = Logger.getLogger(chat.class.getName());
 
     // API Configuration Constants
-    public static final String API_URL = "https://mygenaidev.o9solutions.com/api/ai/chat?agent=qa-saf-failures";
-    public static final String AUTH_TOKEN = "Basic oj3gttcfzc1oot4sxqasyl9v";
+    public static final String API_URL = System.getenv("O9_API_URL");
+    public static final String AUTH_TOKEN = System.getenv("O9_AUTH_TOKEN");
 
     private static final String OUTPUT_FILE_NAME = "agent_response.md";
 
