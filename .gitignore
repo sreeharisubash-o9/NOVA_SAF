@@ -13,3 +13,4 @@ test-output.zip
 **/localactuals/*
 /.idea/*
 .DS_Store
+EnvironmentVariables.xml
