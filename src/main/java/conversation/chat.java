@@ -11,8 +11,8 @@ public class chat {
     private static final Logger LOGGER = Logger.getLogger(chat.class.getName());
 
     // API Configuration Constants
-    public static final String API_URL = System.getenv("O9_API_URL");
-    public static final String AUTH_TOKEN = System.getenv("O9_AUTH_TOKEN");
+    public static final String API_URL = "https://mygenaidev.o9solutions.com/api/ai/chat?agent=qa-saf-failures";
+    public static final String AUTH_TOKEN = "Basic vnzuau2qfp834pzc6g7at1ee";
 
     private static final String OUTPUT_FILE_NAME = "agent_response.md";
 
@@ -24,11 +24,12 @@ public class chat {
 
             while (true) {
                 String USER_PROMPT = new PayloadHandler().getUserPrompt();
-                String jsonPayload = new PayloadHandler().createJsonPayload(USER_PROMPT, null, "699464aa3766958798d894fd");
+                String jsonPayload = new PayloadHandler().createJsonPayload(USER_PROMPT, null,
+                        "69b3a1ca0d7046b5488da6e4");
 
                 try {
                     client.runO9SafScript(jsonPayload, OUTPUT_FILE_NAME);
-                    
+
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "An error occurred during script execution: " + e.getMessage(), e);
                     break;

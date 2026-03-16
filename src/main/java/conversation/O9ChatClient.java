@@ -1,6 +1,5 @@
 package conversation;
 
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -15,7 +14,6 @@ import org.json.JSONObject;
 
 /**
  * Handles the HTTP connection, request sending, response streaming,
- * and delegates JSON parsing to StreamParser.
  */
 
 public class O9ChatClient {
@@ -29,10 +27,10 @@ public class O9ChatClient {
         this.authToken = authToken;
     }
 
-
-
     /**
-     * Executes the API call, reads the streaming response, and extracts the content.
+     * Executes the API call, reads the streaming response, and extracts the
+     * content.
+     * 
      * @param jsonPayload The JSON body for the POST request.
      * @return The concatenated extracted content from the assistant's response.
      */
@@ -46,7 +44,7 @@ public class O9ChatClient {
         try {
             URI uri = new URI(apiUrl);
             URL url = uri.toURL();
-            
+
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setDoOutput(true);
@@ -64,12 +62,13 @@ public class O9ChatClient {
             }
 
             int status = connection.getResponseCode();
-           
+
             if (status != 200) {
                 String errorResponse = "";
                 java.io.InputStream errorStream = connection.getErrorStream();
                 if (errorStream != null) {
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
+                    try (BufferedReader br = new BufferedReader(
+                            new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
                         errorResponse = br.lines().collect(Collectors.joining());
                     }
                 }
@@ -77,7 +76,7 @@ public class O9ChatClient {
                 throw new Exception("API Error " + status + ": " + errorResponse);
             }
 
-            StreamParser.parseStreamResponse(status, connection, outputFileName);
+            StreamParser.parseStreamResponse(status, connection, outputFileName, true);
 
         } finally {
             if (connection != null) {
@@ -88,4 +87,3 @@ public class O9ChatClient {
         }
     }
 }
-
