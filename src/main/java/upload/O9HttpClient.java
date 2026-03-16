@@ -41,26 +41,30 @@ public class O9HttpClient {
      * Executes the file upload using a streaming BodyPublisher.
      * Memory usage remains constant regardless of file size.
      */
-    public void uploadFile(File file, Map<String, String> formFields) throws IOException {
-        // Prepare the streaming body supplier
+    /**
+     * Executes the file upload and returns the response body as a String.
+     * Uses BodyPublishers.ofInputStream to keep memory usage constant.
+     */
+    public String uploadFileAndReturnBody(File file, Map<String, String> formFields) throws IOException {
         Supplier<InputStream> bodySupplier = formBuilder.buildLazyBody(file, formFields);
-        long contentLength = formBuilder.calculateContentLength(file, formFields);
-
+        
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl))
-                .timeout(Duration.ofMinutes(5)) // Higher timeout for large file uploads
+                .timeout(Duration.ofMinutes(5))
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .header("Authorization", authToken)
-                // ofInputStream requires a Supplier to allow for request retries
                 .POST(HttpRequest.BodyPublishers.ofInputStream(bodySupplier))
                 .build();
 
         try {
-            System.out.println("Sending request (" + (contentLength / 1024) + " KB)...");
-            
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            handleResponse(response);
+            
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                handleResponse(response);
+                return response.body();
+            } else {
+                throw new IOException("Server returned status " + response.statusCode() + ": " + response.body());
+            }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
