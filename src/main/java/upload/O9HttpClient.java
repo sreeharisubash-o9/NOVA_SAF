@@ -1,104 +1,88 @@
 package upload;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.io.File;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
- * Handles the core HTTP connection and request/response process.
+ * Modern HTTP Client implementation using java.net.http.HttpClient.
+ * Features non-blocking capabilities, automatic timeout handling, and 
+ * native streaming for multipart uploads.
  */
 public class O9HttpClient {
-    
+
     private final String apiUrl;
     private final String authToken;
     private final String boundary;
     private final MultipartFormBuilder formBuilder;
+    private final HttpClient httpClient;
 
     public O9HttpClient(String apiUrl, String authToken, String boundary, String fileFieldName) {
         this.apiUrl = apiUrl;
         this.authToken = authToken;
         this.boundary = boundary;
         this.formBuilder = new MultipartFormBuilder(boundary, fileFieldName);
+        
+        // Configure a centralized HttpClient with a connection timeout
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
     }
 
     /**
-     * Sets up the connection, sends the multipart request, and prints the response.
+     * Executes the file upload using a streaming BodyPublisher.
+     * Memory usage remains constant regardless of file size.
      */
     public void uploadFile(File file, Map<String, String> formFields) throws IOException {
-        URI uri = null;
-        try {
-            uri = new URI(apiUrl);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-        URL url = uri.toURL();
-        HttpURLConnection connection = null;
+        // Prepare the streaming body supplier
+        Supplier<InputStream> bodySupplier = formBuilder.buildLazyBody(file, formFields);
+        long contentLength = formBuilder.calculateContentLength(file, formFields);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
+                .timeout(Duration.ofMinutes(5)) // Higher timeout for large file uploads
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("Authorization", authToken)
+                // ofInputStream requires a Supplier to allow for request retries
+                .POST(HttpRequest.BodyPublishers.ofInputStream(bodySupplier))
+                .build();
 
         try {
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setDoInput(true);
-            connection.setUseCaches(false);
+            System.out.println("Sending request (" + (contentLength / 1024) + " KB)...");
+            
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // 1. Build the multipart request body
-            byte[] requestBody = formBuilder.buildBody(file, formFields);
+            handleResponse(response);
 
-            // 2. Set required headers
-            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-            connection.setRequestProperty("Authorization", authToken);
-            connection.setRequestProperty("Content-Length", String.valueOf(requestBody.length));
-
-            // 3. Write the body
-            try (OutputStream outputStream = connection.getOutputStream()) {
-                outputStream.write(requestBody);
-                outputStream.flush();
-            }
-
-            // 4. Get the response code and body
-            int status = connection.getResponseCode();
-
-            // Determine whether to read from the input stream (success) or error stream (failure)
-            InputStream responseStream = (status >= 200 && status < 300) 
-                                         ? connection.getInputStream() 
-                                         : connection.getErrorStream();
-
-            String responseBody = readResponse(responseStream);
-
-            System.out.println("\n--- Server Response ---");
-            System.out.println("Status: " + status);
-            System.out.println("Body: " + responseBody);
-            System.out.println("-----------------------");
-
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Upload interrupted", e);
         }
     }
-    
+
     /**
-     * Reads the entire content from an InputStream into a single String.
+     * Handles the HTTP response logic and status code validation.
      */
-    private String readResponse(InputStream inputStream) throws IOException {
-        if (inputStream == null) return "No response stream available.";
-        
-        StringBuilder response = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-            }
+    private void handleResponse(HttpResponse<String> response) {
+        int status = response.statusCode();
+        String body = response.body();
+
+        System.out.println("\n--- Server Response ---");
+        System.out.println("Status: " + status);
+        if (status >= 200 && status < 300) {
+            System.out.println("Success: Upload completed.");
+        } else {
+            System.err.println("Failure: Server returned an error.");
         }
-        return response.toString();
+        System.out.println("Body: " + body);
+        System.out.println("-----------------------");
     }
 }

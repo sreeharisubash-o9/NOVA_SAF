@@ -5,26 +5,30 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
+
 /**
  * Main application class to configure and run the multipart file upload client.
  */
 public class ImagerUploader {
 
     // API Configuration Constants
-    private static final String API_URL = "https://mygenaidev.o9solutions.com/api/ai/file_manager/upload_and_ingest";
-    private static final String AUTH_TOKEN = "Basic vnzuau2qfp834pzc6g7at1ee";
-    private static final String FILE_FIELD_NAME = "file";
+    public static Dotenv dotenv = Dotenv.load();
+    private static final String API_URL = dotenv.get("O9_API_URL_FILE_UPLOAD");
+    private static final String AUTH_TOKEN = dotenv.get("O9_AUTH_TOKEN");
+    private static final String FILE_FIELD_NAME = dotenv.get("O9_FILE_FIELD_NAME");
+    private static final String FILE_PATH = dotenv.get("O9_FILE_PATH");
 
     // Boundary constant shared across the client and builder
     public static final String BOUNDARY = "---PureJavaBoundary123456789";
 
     public static void main(String[] args) {
         // NOTE: The file path MUST exist.
-        String filePath = "C:\\Users\\sreehari.subash\\Pictures\\Screenshots\\EkgFailureTest.png";
-        File imageFile = new File(filePath);
+        File imageFile = new File(FILE_PATH);
 
         if (!imageFile.exists()) {
-            System.err.println("Error: Image file not found at " + filePath);
+            System.err.println("Error: Image file not found at " + FILE_PATH);
             System.err.println("Please verify the file path and accessibility.");
             return;
         }
