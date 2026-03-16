@@ -1,89 +1,81 @@
 package conversation;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-
-import org.json.JSONObject;
 
 /**
- * Handles the HTTP connection, request sending, response streaming,
+ * Modernized API client for o9SAF, utilizing Java's HttpClient for 
+ * robust, asynchronous, and memory-efficient communication.
  */
-
 public class O9ChatClient {
 
     private static final Logger LOGGER = Logger.getLogger(O9ChatClient.class.getName());
+    
+    // Configurable timeouts for enterprise resilience
+    private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofMinutes(2);
+
     private final String apiUrl;
     private final String authToken;
+    private final HttpClient httpClient;
 
+    /**
+     * Initializes the client with a shared HttpClient instance.
+     * Shared clients are more efficient for connection pooling.
+     */
     public O9ChatClient(String apiUrl, String authToken) {
         this.apiUrl = apiUrl;
         this.authToken = authToken;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(CONNECTION_TIMEOUT)
+                .build();
     }
 
     /**
-     * Executes the API call, reads the streaming response, and extracts the
-     * content.
-     * 
-     * @param jsonPayload The JSON body for the POST request.
-     * @return The concatenated extracted content from the assistant's response.
+     * Executes the POST request and pipes the response stream to the parser.
+     * * @param jsonPayload    The JSON body constructed by PayloadHandler.
+     * @param outputFileName The destination for the logged response.
      */
-
     public void runO9SafScript(String jsonPayload, String outputFileName) throws Exception {
-        HttpURLConnection connection = null;
+        LOGGER.info("Initiating o9SAF API request...");
 
-        LOGGER.info("=== Starting o9SAF Automation ===");
-        LOGGER.info("Sending request to o9SAF agent...");
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Authorization", authToken)
+                .header("Accept", "text/event-stream")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                .build();
 
-        try {
-            URI uri = new URI(apiUrl);
-            URL url = uri.toURL();
+        // Send request and handle response as an InputStream for memory efficiency
+        HttpResponse<java.io.InputStream> response = httpClient.send(
+                request, 
+                HttpResponse.BodyHandlers.ofInputStream()
+        );
 
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setDoInput(true);
-
-            // Set required headers
-            connection.setRequestProperty("Authorization", authToken);
-            connection.setRequestProperty("Accept", "text/event-stream");
-            connection.setRequestProperty("Content-Type", "application/json");
-
-            // Write the JSON payload
-            try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-
-            int status = connection.getResponseCode();
-
-            if (status != 200) {
-                String errorResponse = "";
-                java.io.InputStream errorStream = connection.getErrorStream();
-                if (errorStream != null) {
-                    try (BufferedReader br = new BufferedReader(
-                            new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
-                        errorResponse = br.lines().collect(Collectors.joining());
-                    }
-                }
-
-                throw new Exception("API Error " + status + ": " + errorResponse);
-            }
-
-            StreamParser.parseStreamResponse(status, connection, outputFileName, true);
-
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-
-            LOGGER.info("=== o9SAF Automation Completed ===");
+        int statusCode = response.statusCode();
+        if (statusCode != 200) {
+            LOGGER.log(Level.SEVERE, "API request failed with status: {0}", statusCode);
+            throw new RuntimeException("HTTP Error: " + statusCode);
         }
+
+        // Use the refactored StreamParser with a functional callback
+        StreamParser.parseAndProcess(response.body(), (assistantContent, userPrompt) -> {
+            // Decoupled logic: Log to file and then attempt JSON extraction
+            ResponseLogger.saveResponseToFile(assistantContent, userPrompt, outputFileName);
+            
+            MarkdownJsonExtractor.extract(assistantContent).ifPresent(json -> {
+                LOGGER.info("Valid JSON block extracted from response.");
+                // Additional processing logic for the extracted JSON can go here
+            });
+        });
+
+        LOGGER.info("o9SAF Transaction completed successfully.");
     }
 }

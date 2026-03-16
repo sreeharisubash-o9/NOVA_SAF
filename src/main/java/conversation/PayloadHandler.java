@@ -1,43 +1,45 @@
 package conversation;
 
-import java.util.Scanner;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.Objects;
 
+/**
+ * Handles the construction of API request payloads using standard JSON libraries.
+ * Ensures structural integrity and proper character escaping.
+ */
 public class PayloadHandler {
-    public String getUserPrompt() {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter your prompt for the o9SAF agent:");
-        String userPrompt = scanner.nextLine();
-        // Don't close scanner to keep System.in open for subsequent calls
-        return userPrompt;
-    }
 
+    /**
+     * Constructs a valid JSON payload for the o9SAF API.
+     * Use of org.json ensures all special characters in the prompt are safely escaped.
+     *
+     * @param userPrompt The raw text input from the user.
+     * @param fileName   The name of the attachment (defaults to empty string if null).
+     * @param fileId     The unique identifier for the file (defaults to empty string if null).
+     * @return A minified JSON string ready for the POST request.
+     */
     public String createJsonPayload(String userPrompt, String fileName, String fileId) {
-        if (fileName == null) {
-            fileName = " ";
-        }
+        // Defensive check for mandatory field
+        String message = Objects.requireNonNullElse(userPrompt, "").trim();
+        
+        // Build the root object
+        JSONObject payload = new JSONObject();
+        payload.put("message", message);
+        payload.put("thread_context", JSONObject.NULL);
+        payload.put("tags", JSONObject.NULL);
 
-        if (fileId == null) {
-            fileId = " ";
-        }
+        // Build the attachment object
+        JSONObject attachment = new JSONObject();
+        attachment.put("file_name", Objects.requireNonNullElse(fileName, ""));
+        attachment.put("file_id", Objects.requireNonNullElse(fileId, ""));
 
-        // Escape backslashes first, then double quotes
-    String escapedPrompt = userPrompt
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r");
+        // Add attachment to a JSONArray
+        JSONArray attachments = new JSONArray();
+        attachments.put(attachment);
+        
+        payload.put("attachments", attachments);
 
-    return "{"
-            + "\"message\": \"" + escapedPrompt + "\","
-            + "\"fileId\": \"\","
-            + "\"attachments\": ["
-            + "    {"
-            + "        \"file_name\": \"" + fileName + "\","
-            + "        \"file_id\": \"" + fileId + "\""
-            + "    }"
-            + "],"
-            + "\"thread_context\": null,"
-            + "\"tags\": null"
-            + "}";
+        return payload.toString();
     }
 }

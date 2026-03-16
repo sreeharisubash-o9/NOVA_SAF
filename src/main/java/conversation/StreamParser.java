@@ -1,86 +1,82 @@
 package conversation;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.function.BiConsumer;
 import java.util.logging.Logger;
-import java.net.HttpURLConnection;
-
 import org.json.JSONObject;
 
 /**
- * Utility class to handle crude parsing of concatenated JSON strings
- * without using external JSON libraries.
+ * Enterprise-standard SSE (Server-Sent Events) Stream Parser.
+ * Designed with a callback mechanism to decouple stream processing from data handling.
  */
-
 public class StreamParser {
 
+    private static final Logger LOGGER = Logger.getLogger(StreamParser.class.getName());
+    private static final String DATA_PREFIX = "data: ";
+    private static final String DONE_SIGNAL = "[DONE]";
+
     private StreamParser() {
-        // Private constructor to prevent instantiation of a utility class
+        // Private constructor for utility class
     }
 
     /**
-     * Implements bracket-counting logic to split a string containing
-     * multiple concatenated JSON objects, typical of SSE streams.
-     * 
-     * @param data The raw streaming response text.
-     * @return A list of individual, top-level JSON object strings.
+     * Parses the incoming stream line-by-line and triggers a callback for gathered content.
+     * This implementation is memory-efficient as it processes data as it arrives.
+     *
+     * @param inputStream The raw stream from the HTTP connection.
+     * @param onCompletion Callback receiving (FullAssistantContent, UserPrompt).
      */
+    public static void parseAndProcess(InputStream inputStream, BiConsumer<String, String> onCompletion) throws Exception {
+        StringBuilder assistantBuffer = new StringBuilder();
+        StringBuilder userBuffer = new StringBuilder();
 
-    public static void parseStreamResponse(int status, HttpURLConnection connection, String outputFileName,
-            boolean convertToJSON) throws Exception {
-        final Logger LOGGER = Logger.getLogger(O9ChatClient.class.getName());
-
-        LOGGER.info("Response received from o9-QA-SAF agent: " + status);
-        LOGGER.info("Processing response stream...");
-
-        // Read the entire streaming response into a single buffer
-        StringBuilder agentResponseText = new StringBuilder();
-        StringBuilder userRequestText = new StringBuilder();
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                // SSE responses often have "data: " prefix. Remove it if present.
-                String processedLine = line.startsWith("data: ") ? line.substring(6).trim() : line.trim();
-
-                if (!processedLine.isEmpty() && !processedLine.equalsIgnoreCase("[DONE]")) {
-                    JSONObject mainObject = new JSONObject(processedLine);
-                    if (mainObject.has("content")) {
-                        String type = mainObject.getString("type");
-                        if ("assistant".equals(type)) {
-                            agentResponseText.append(mainObject.getString("content"));
-                        } else if ("user".equals(type)) {
-                            userRequestText.append(mainObject.getString("content"));
-                        }
-                    }
-                }
+                processLine(line, assistantBuffer, userBuffer);
             }
         }
 
-        // Save the response to a file
-        ResponseLogger.saveResponseToFile(agentResponseText.toString(), userRequestText.toString(), outputFileName);
-        LOGGER.info("Response stream processing completed. Output saved to: " + outputFileName);
+        String finalAssistantText = assistantBuffer.toString();
+        String finalUserText = userBuffer.toString();
 
-        // Process extraction of json if requested
-        if (convertToJSON) {
-            MarkdownJsonExtractor.extract(agentResponseText.toString())
-                .ifPresentOrElse(
-                    jsonString -> {
-                        try {
-                            // 1. Store in a JSON datatype variable
-                            JSONObject extractedData = new JSONObject(jsonString);
-                            System.out.println("Extracted JSON Object: " + extractedData);
-
-                        } catch (Exception e) {
-                            LOGGER.severe("Extraction found a block, but it wasn't valid JSON: " + e.getMessage());
-                        }
-                    },
-                    () -> LOGGER.severe("JSON extraction requested, but no valid JSON block found.")
-                );
+        // Pass the results to the callback (e.g., for logging or extraction)
+        if (onCompletion != null) {
+            onCompletion.accept(finalAssistantText, finalUserText);
         }
-
     }
 
+    private static void processLine(String line, StringBuilder assistantBuffer, StringBuilder userBuffer) {
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) return;
+
+        // Strip SSE "data: " prefix
+        String jsonPayload = trimmed.startsWith(DATA_PREFIX) ? trimmed.substring(DATA_PREFIX.length()).trim() : trimmed;
+
+        if (DONE_SIGNAL.equalsIgnoreCase(jsonPayload)) {
+            LOGGER.info("Streaming response signaling completion.");
+            return;
+        }
+
+        try {
+            JSONObject json = new JSONObject(jsonPayload);
+            if (json.has("content") && json.has("type")) {
+                String type = json.getString("type");
+                String content = json.getString("content");
+
+                if ("assistant".equals(type)) {
+                    assistantBuffer.append(content);
+                } else if ("user".equals(type)) {
+                    userBuffer.append(content);
+                }
+            }
+
+        } catch (Exception e) {
+            // Log and skip malformed lines typical in noisy streams
+            LOGGER.warning("Skipping malformed stream line: " + e.getMessage());
+        }
+    }
 }
