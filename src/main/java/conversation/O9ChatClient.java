@@ -1,5 +1,6 @@
 package conversation;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -41,7 +42,7 @@ public class O9ChatClient {
      * * @param jsonPayload    The JSON body constructed by PayloadHandler.
      * @param outputFileName The destination for the logged response.
      */
-    public void runO9SafScript(String jsonPayload, String outputFileName) throws Exception {
+    public void runO9SafScript(String jsonPayload, String outputFileName) throws IOException, InterruptedException {
         LOGGER.info("Initiating o9SAF API request...");
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -75,7 +76,7 @@ public class O9ChatClient {
                 // Additional processing logic for the extracted JSON can go here
             });
         });
-
+        
         LOGGER.info("o9SAF Transaction completed successfully.");
     }
 }

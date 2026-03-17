@@ -9,9 +9,10 @@ import java.io.InputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Enumeration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 import java.util.function.Supplier;
 
 /**
@@ -41,7 +42,8 @@ public class MultipartFormBuilder {
      */
     public Supplier<InputStream> buildLazyBody(File file, Map<String, String> formFields) {
         return () -> {
-            Vector<InputStream> streams = new Vector<>();
+            List<InputStream> streams = new ArrayList<>();
+
 
             // 1. Add Text Fields
             formFields.forEach((name, value) -> {
@@ -68,8 +70,8 @@ public class MultipartFormBuilder {
             String footer = CRLF + HYPHENS + boundary + HYPHENS + CRLF;
             streams.add(new ByteArrayInputStream(footer.getBytes(StandardCharsets.UTF_8)));
 
-            Enumeration<InputStream> en = streams.elements();
-            return new SequenceInputStream(en);
+            return new SequenceInputStream(Collections.enumeration(streams));
+
         };
     }
 

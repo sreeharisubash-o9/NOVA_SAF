@@ -15,11 +15,10 @@ public class PayloadHandler {
      * Use of org.json ensures all special characters in the prompt are safely escaped.
      *
      * @param userPrompt The raw text input from the user.
-     * @param fileName   The name of the attachment (defaults to empty string if null).
      * @param fileId     The unique identifier for the file (defaults to empty string if null).
      * @return A minified JSON string ready for the POST request.
      */
-    public String createJsonPayload(String userPrompt, String fileName, String fileId) {
+    public String createJsonPayload(String userPrompt, String fileId) {
         // Defensive check for mandatory field
         String message = Objects.requireNonNullElse(userPrompt, "").trim();
         
@@ -31,7 +30,7 @@ public class PayloadHandler {
 
         // Build the attachment object
         JSONObject attachment = new JSONObject();
-        attachment.put("file_name", Objects.requireNonNullElse(fileName, ""));
+        attachment.put("file_name", JSONObject.NULL);
         attachment.put("file_id", Objects.requireNonNullElse(fileId, ""));
 
         // Add attachment to a JSONArray

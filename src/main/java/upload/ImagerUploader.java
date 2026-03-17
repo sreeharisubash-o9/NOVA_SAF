@@ -4,9 +4,9 @@ import java.io.File;
 import java.io.IOException;
 
 import java.util.Map;
+import java.util.UUID;
 
 import org.json.JSONObject;
-import io.github.cdimascio.dotenv.Dotenv;
 
 /**
  * Service class for handling image persistence. 
@@ -17,13 +17,11 @@ public class ImagerUploader {
     private final O9HttpClient client;
 
     // API Configuration Constants
-    public ImagerUploader() {
-        Dotenv dotenv = Dotenv.load();
-        String API_URL_FILE_UPLOAD = dotenv.get("O9_API_URL_FILE_UPLOAD");
-        String AUTH_TOKEN = dotenv.get("O9_AUTH_TOKEN");
-        String FILE_FIELD_NAME = dotenv.get("O9_FILE_FIELD_NAME");
-        String FILE_PATH = dotenv.get("O9_FILE_PATH");
-        String BOUNDARY = "---PureJavaBoundary123456789";
+    public ImagerUploader(String apiUrlFileUpload, String authToken, String fileFieldName) {
+        String API_URL_FILE_UPLOAD = apiUrlFileUpload;
+        String AUTH_TOKEN = authToken;
+        String FILE_FIELD_NAME = fileFieldName;
+        String BOUNDARY = "Boundary-" + UUID.randomUUID().toString().replace("-", "");
         this.client = new O9HttpClient(API_URL_FILE_UPLOAD, AUTH_TOKEN, BOUNDARY, FILE_FIELD_NAME);
     }
 
@@ -34,7 +32,7 @@ public class ImagerUploader {
         if (!file.exists()) {
             throw new IOException("Target file does not exist: " + file.getAbsolutePath());
         }
-        
+
         String responseBody = client.uploadFileAndReturnBody(file, metadata);
         JSONObject json = new JSONObject(responseBody);
 

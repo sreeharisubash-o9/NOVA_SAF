@@ -1,6 +1,7 @@
 package conversation;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,7 @@ public class StreamParser {
      * @param inputStream The raw stream from the HTTP connection.
      * @param onCompletion Callback receiving (FullAssistantContent, UserPrompt).
      */
-    public static void parseAndProcess(InputStream inputStream, BiConsumer<String, String> onCompletion) throws Exception {
+    public static void parseAndProcess(InputStream inputStream, BiConsumer<String, String> onCompletion) throws IOException {
         StringBuilder assistantBuffer = new StringBuilder();
         StringBuilder userBuffer = new StringBuilder();
 

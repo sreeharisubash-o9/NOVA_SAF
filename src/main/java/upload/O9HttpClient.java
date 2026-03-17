@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.io.File;
 import java.util.Map;
+import java.util.logging.Logger;
 import java.util.function.Supplier;
 
 /**
@@ -18,6 +19,7 @@ import java.util.function.Supplier;
  */
 public class O9HttpClient {
 
+    private static final Logger LOGGER = Logger.getLogger(O9HttpClient.class.getName());    
     private final String apiUrl;
     private final String authToken;
     private final String boundary;
@@ -37,10 +39,6 @@ public class O9HttpClient {
                 .build();
     }
 
-    /**
-     * Executes the file upload using a streaming BodyPublisher.
-     * Memory usage remains constant regardless of file size.
-     */
     /**
      * Executes the file upload and returns the response body as a String.
      * Uses BodyPublishers.ofInputStream to keep memory usage constant.
@@ -79,14 +77,14 @@ public class O9HttpClient {
         int status = response.statusCode();
         String body = response.body();
 
-        System.out.println("\n--- Server Response ---");
-        System.out.println("Status: " + status);
+        LOGGER.info("\n--- Server Response ---");
+        LOGGER.info("Status: " + status);
         if (status >= 200 && status < 300) {
-            System.out.println("Success: Upload completed.");
+            LOGGER.info("Success: Upload completed.");
         } else {
-            System.err.println("Failure: Server returned an error.");
+            LOGGER.severe("Failure: Server returned an error.");
         }
-        System.out.println("Body: " + body);
-        System.out.println("-----------------------");
+        LOGGER.info("Body: " + body);
+        LOGGER.info("-----------------------");
     }
 }

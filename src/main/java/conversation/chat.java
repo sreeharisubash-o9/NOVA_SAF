@@ -15,27 +15,28 @@ import io.github.cdimascio.dotenv.Dotenv;
 public class Chat {
 
     private static final Logger LOGGER = Logger.getLogger(Chat.class.getName());
-    public static final Dotenv dotenv = Dotenv.load();
+    private static final Dotenv dotenv = Dotenv.load();
     
+    private static final String API_URL_FILE_UPLOAD = dotenv.get("O9_API_URL_FILE_UPLOAD");
     private static final String API_URL = dotenv.get("O9_API_URL");
     private static final String AUTH_TOKEN = dotenv.get("O9_AUTH_TOKEN");
     private static final String OUTPUT_FILE = dotenv.get("OUTPUT_FILE_NAME");
+    private static final String O9_FILE_FIELD_NAME = dotenv.get("O9_FILE_FIELD_NAME");
 
     public static void main(String[] args) {
         validateEnvironment();
 
         O9ChatClient chatClient = new O9ChatClient(API_URL, AUTH_TOKEN);
-        ImagerUploader uploader = new ImagerUploader();
+        ImagerUploader uploader = new ImagerUploader(API_URL_FILE_UPLOAD, AUTH_TOKEN, O9_FILE_FIELD_NAME);
         PayloadHandler payloadHandler = new PayloadHandler();
 
         try (Scanner scanner = new Scanner(System.in)) {
             LOGGER.info("o9SAF Orchestrator Active.");
 
             System.out.println("Enter image path to attach (or press Enter to skip):");
-            String pathInput = scanner.nextLine().trim();
             
-            String fileId = "69b7e18f9a3b23ded66c7b9a";
-            String fileName = null;
+            String pathInput = scanner.nextLine().trim();
+            String fileId = null;
 
             // Step 1: Sequential Upload if a path is provided
             if (!pathInput.isEmpty()) {
@@ -48,7 +49,8 @@ public class Chat {
                     );
                     
                     fileId = uploader.uploadAndGetFileId(file, metadata);
-                    LOGGER.info("Successfully linked File ID: " + fileId);
+                    LOGGER.log(Level.INFO, "Successfully linked File ID: {0}", fileId);
+
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Upload failed, proceeding without attachment: {0}", e.getMessage());
                 }
@@ -58,7 +60,7 @@ public class Chat {
             System.out.print("\nMessage > ");
             String prompt = scanner.nextLine();
 
-            String jsonPayload = payloadHandler.createJsonPayload(prompt, fileName, fileId);
+            String jsonPayload = payloadHandler.createJsonPayload(prompt, fileId);
             chatClient.runO9SafScript(jsonPayload, OUTPUT_FILE);
 
         } catch (Exception e) {
@@ -67,8 +69,29 @@ public class Chat {
     }
 
     private static void validateEnvironment() {
-        if (AUTH_TOKEN == null || AUTH_TOKEN.isBlank()) {
-            throw new IllegalStateException("O9_AUTH_TOKEN not found in environment.");
+        String[] requiredKeys = {
+            "O9_AUTH_TOKEN",
+            "O9_API_URL",
+            "O9_API_URL_FILE_UPLOAD",
+            "OUTPUT_FILE_NAME",
+            "O9_FILE_FIELD_NAME"
+        };
+
+        for (String key : requiredKeys) {
+            String value = dotenv.get(key);
+            if (value == null || value.isBlank()) {
+                String description = switch (key) {
+                    case "O9_AUTH_TOKEN"          -> "API authentication token";
+                    case "O9_API_URL"             -> "chat API endpoint URL";
+                    case "O9_API_URL_FILE_UPLOAD" -> "file upload API endpoint URL";
+                    case "OUTPUT_FILE_NAME"       -> "output file path";
+                    case "O9_FILE_FIELD_NAME"     -> "file field name for multipart upload";
+                    default                       -> "required configuration value";
+                };
+                throw new IllegalStateException(
+                    "Missing environment variable [" + key + "]: " + description
+                );
+            }
         }
     }
 }
